@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Ball Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #1f1f1f;
+        }
+
+        .ball {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            position: absolute;
+            cursor: grab;
+        }
+
+        button {
+            position: fixed;
+            padding: 10px;
+            cursor: pointer;
+            border: none;
+            color: white;
+            background-color: #4e4e4e;
+        }
+
+        #stopButton {
+            top: 10px;
+            left: 10px;
+        }
+
+        #resetButton {
+            top: 10px;
+            left: calc(50% - 50px);
+        }
+
+        #addButton {
+            top: 10px;
+            right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <button id="stopButton">Stop</button>
+    <button id="resetButton">Reset</button>
+    <button id="addButton">Add Ball</button>
+
+    <script>
+        const container = document.getElementById('container');
+        const stopButton = document.getElementById('stopButton');
+        const resetButton = document.getElementById('resetButton');
+        const addButton = document.getElementById('addButton');
+        let isDragging = false;
+        let isThrowing = false;
+        let balls = [];
+
+        stopButton.addEventListener('click', () => {
+            isThrowing = false;
+        });
+
+        resetButton.addEventListener('click', () => {
+            isThrowing = false;
+            balls.forEach(ball => {
+                ball.positionX = window.innerWidth / 2 - ball.element.clientWidth / 2;
+                ball.positionY = window.innerHeight / 2 - ball.element.clientHeight / 2;
+                ball.velocityX = 0;
+                ball.velocityY = 0;
+                ball.element.style.transform = `translate(${ball.positionX}px, ${ball.positionY}px)`;
+            });
+        });
+
+        addButton.addEventListener('click', () => {
+            createBall();
+        });
+
+        function createBall() {
+            const newBall = {
+                element: document.createElement('div'),
+                isDragging: false,
+                isThrowing: false,
+                startPositionX: 0,
+                startPositionY: 0,
+                positionX: window.innerWidth / 2 - 25, // Centered horizontally
+                positionY: window.innerHeight / 2 - 25, // Centered vertically
+                velocityX: 0,
+                velocityY: 0,
+                gravity: 0.5,
+                damping: 0.8
+            };
+
+            // Assign a random color to the ball
+            newBall.element.className = 'ball';
+            newBall.element.style.backgroundColor = getRandomColor();
+            newBall.element.style.transform = `translate(${newBall.positionX}px, ${newBall.positionY}px)`;
+            newBall.element.addEventListener('touchstart', (e) => startDragging(newBall, e));
+            container.appendChild(newBall.element);
+            balls.push(newBall);
+        }
+
+        function startDragging(ball, e) {
+            ball.isDragging = true;
+            ball.startPositionX = e.touches[0].clientX - ball.element.clientWidth / 2;
+            ball.startPositionY = e.touches[0].clientY - ball.element.clientHeight / 2;
+            ball.element.style.cursor = 'grabbing';
+            document.addEventListener('touchmove', onTouchMove);
+            document.addEventListener('touchend', onTouchEnd);
+        }
+
+        function onTouchMove(e) {
+            balls.forEach(ball => {
+                if (ball.isDragging) {
+                    ball.positionX = e.touches[0].clientX - ball.element.clientWidth / 2;
+                    ball.positionY = e.touches[0].clientY - ball.element.clientHeight / 2;
+
+                    // Ensure the ball stays within the window
+                    ball.positionX = Math.max(0, Math.min(ball.positionX, window.innerWidth - ball.element.clientWidth));
+                    ball.positionY = Math.max(0, Math.min(ball.positionY, window.innerHeight - ball.element.clientHeight));
+
+                    ball.element.style.transform = `translate(${ball.positionX}px, ${ball.positionY}px)`;
+                }
+            });
+        }
+
+        function onTouchEnd() {
+            balls.forEach(ball => {
+                if (ball.isDragging) {
+                    ball.isDragging = false;
+                    ball.isThrowing = true;
+                    ball.element.style.cursor = 'grab';
+                    throwBall(ball);
+                    document.removeEventListener('touchmove', onTouchMove);
+                    document.removeEventListener('touchend', onTouchEnd);
+                }
+            });
+        }
+
+        function throwBall(ball) {
+            const throwSpeed = 10; // Adjust the throwing speed as needed
+            ball.velocityX = (ball.positionX - ball.startPositionX) / throwSpeed;
+            ball.velocityY = (ball.positionY - ball.startPositionY) / throwSpeed;
+
+            // Start the animation loop for the throwing motion
+            requestAnimationFrame(() => updateBall(ball));
+        }
+
+        function updateBall(ball) {
+            if (ball.isThrowing) {
+                ball.velocityY += ball.gravity;
+                ball.positionX += ball.velocityX;
+                ball.positionY += ball.velocityY;
+
+                // Bounce on window edges
+                if (ball.positionX < 0 || ball.positionX > window.innerWidth - ball.element.clientWidth) {
+                    ball.velocityX *= -1;
+                }
+
+                if (ball.positionY > window.innerHeight - ball.element.clientHeight) {
+                    ball.positionY = window.innerHeight - ball.element.clientHeight;
+                    ball.velocityY *= -ball.damping; // Bounce with damping
+                }
+
+                ball.element.style.transform = `translate(${ball.positionX}px, ${ball.positionY}px)`;
+
+                // Continue the animation until the ball comes to rest
+                if (Math.abs(ball.velocityX) > 0.1 || Math.abs(ball.velocityY) > 0.1) {
+                    requestAnimationFrame(() => updateBall(ball));
+                } else {
+                    ball.isThrowing = false;
+                }
+            }
+        }
+
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+    </script>
+</body>
+</html>
